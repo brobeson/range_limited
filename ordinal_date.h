@@ -3,12 +3,31 @@
 
 namespace od
 {
-    enum class era { bce, ce };
+    enum class era_t { bce, ce };
+    
+    class year_t
+    {
+    public:
+        year_t() = default;
+        year_t(const int y, const era_t e): year(std::abs(y)), era(e) {}
+        year_t(const year_t&) = default;
+        year_t(year_t&&) = default;
+        year_t& operator=(const year_t&) = default;
+        year_t& operator=(year_t&&) = default;
+        ~year_t() noexcept = default;
+        
+        int year() const noexcept { return m_year; }
+        era_t era() const noexcept { return m_era; }
+        
+    private:
+        int m_year {1970};
+        era_t m_era {era_t::ce};
+    };
     
     class ordinal_date
     {
     public:
-        using year_type = int;
+        using year_type = year_t;
         using day_type = int;
         using milliseconds = std::chrono::milliseconds;
         
@@ -53,6 +72,17 @@ namespace od
         milliseconds m_ms {0};
     };
     
+    namespace details
+    {
+        // wrap milliseconds exceeding 1 day into years, days, and remaining milliseconds
+        using need_a_name = std::tuple<ordinal_date::year_type, ordinal_date::day_type, ordinal_date::milliseconds>;
+        need_a_name wrap_milliseconds(ordinal_date::milliseconds ms);
+        
+        // wrap days exceeding 1 year into years and remaining days
+        using another_name = std::pair<ordinal_date::year_type, ordinal_date::day_type>;
+        another_name wrap_days(ordinal_date::day_type days);
+    }
+    
     template <class Rep, class Period>
     ordinal_date::ordinal_date(const year_type y,
                                const day_type d,
@@ -61,13 +91,8 @@ namespace od
         m_day{d},
         m_ms{std::chrono::duration_cast<milliseconds>(time)}
     {
-        // roll milliseconds to years
-        const auto ms_years = m_ms.count() / ms_per_year;
-        if (ms_years < 0 && std::abs(ms_years) >= m_year)
-            m_year -= (ms_years - 1);
-        else
-            m_year -= ms_years;
-            
+        auto [years, days, ms] = details::wrap_milliseconds(m_ms);
+        [years, days] = details::wrap_days(m_day);
     }
 }
 
